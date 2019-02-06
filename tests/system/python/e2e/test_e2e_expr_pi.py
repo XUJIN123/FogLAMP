@@ -103,7 +103,8 @@ class TestE2eExprPi:
         assert 0 < len(jdoc)
 
         read = jdoc[0]["reading"]
-        assert 1.61977519054386 == read["Expression"]
+        # FOGL-2438 values like tan(45) = 1.61977519054386 gets truncated to 1.6197751905 with ingest
+        assert 1.6197751905 == read["Expression"]
         # verify filter is applied and we have {name: value} pair added by metadata filter
         assert "value" == read["name"]
 
@@ -125,4 +126,5 @@ class TestE2eExprPi:
         assert isinstance(data_from_pi["name"], list)
         assert isinstance(data_from_pi["Expression"], list)
         assert "value" in data_from_pi["name"]
-        assert 1.61977519054386 in data_from_pi["Expression"]
+        # FOGL-2438 values like tan(45) = 1.61977519054386 gets truncated to 1.6197751905 with ingest
+        assert 1.6197751905 in data_from_pi["Expression"]
