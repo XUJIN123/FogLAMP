@@ -47,18 +47,14 @@ class TestE2eExprPi:
                "stepX": {"value": "0"}}
 
         add_south(SOUTH_PLUGIN, south_branch, foglamp_url, service_name=SVC_NAME, config=cfg,
-                  plugin_lang=SOUTH_PLUGIN_LANGUAGE, start_service=False)
+                  plugin_lang=SOUTH_PLUGIN_LANGUAGE, start_service=True)
 
         filter_cfg = {"enable": "true"}
         filter_plugin = "metadata"
         add_filter(filter_plugin, filter_branch, filter_name, filter_cfg, foglamp_url, SVC_NAME)
 
-        enable_schedule(foglamp_url, SVC_NAME)
+        # enable_schedule(foglamp_url, SVC_NAME)
 
-        # FIXME: FOGL-2417
-        # We need to make north PI sending process to handle the case, to send and retrieve applied filter data
-        # in running service, so that we don't need to add south service in disabled mode And enable after applying
-        # filter pipeline
         start_north_pi_server_c(foglamp_url, pi_host, pi_port, pi_token)
 
         yield self.start_south_north
