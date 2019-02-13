@@ -18,9 +18,12 @@ __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
 
-# FIXME: fixture should be used at class level (and once only)
+@pytest.fixture(scope='class')
+def reset_start_foglamp_once(reset_and_start_foglamp):
+    pass
 
-@pytest.mark.usefixtures('reset_and_start_foglamp')
+
+@pytest.mark.usefixtures('reset_start_foglamp_once')
 class TestConfiguration:
 
     def test_get_categories_default(self, foglamp_url):
