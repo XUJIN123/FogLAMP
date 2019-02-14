@@ -18,15 +18,9 @@ __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
 
-@pytest.fixture(scope='class')
-def reset_start_foglamp_once(reset_and_start_foglamp):
-    pass
-
-
-@pytest.mark.usefixtures('reset_start_foglamp_once')
 class TestConfiguration:
 
-    def test_get_categories_default(self, foglamp_url):
+    def test_default(self, foglamp_url, reset_and_start_foglamp):
         conn = http.client.HTTPConnection(foglamp_url)
 
         conn.request("GET", '/foglamp/category')
