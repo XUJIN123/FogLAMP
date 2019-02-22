@@ -768,14 +768,15 @@ ostringstream convert;
  * @param full	false is the deafult, true evaluates all the members of the CategoryItems
  *
  */
-string ConfigCategory::itemsToJSON(const bool full) const
+string ConfigCategory::itemsToJSON(const bool full, const bool jsonQuotes) const
 {
 ostringstream convert;
 
 	convert << "{";
 	for (auto it = m_items.cbegin(); it != m_items.cend(); it++)
 	{
-		convert << (*it)->toJSON(full);
+		Logger::getLogger()->info("(*it)->toJSON(full)=%s", ((*it)->toJSON(full)).c_str());
+		convert << (*it)->toJSON(full, jsonQuotes);
 		if (it + 1 != m_items.cend() )
 		{
 			convert << ", ";
@@ -1177,7 +1178,7 @@ ConfigCategory::CategoryItem::CategoryItem(const CategoryItem& rhs)
  * @param full	false is the deafult, true evaluates all the members of the CategoryItem
  *
  */
-string ConfigCategory::CategoryItem::toJSON(const bool full) const
+string ConfigCategory::CategoryItem::toJSON(const bool full, const bool jsonQuotes) const
 {
 ostringstream convert;
 
@@ -1200,14 +1201,15 @@ ostringstream convert;
 		convert << "], ";
 	}
 
-	if (m_itemType == StringItem ||
+	if ((m_itemType == JsonItem && jsonQuotes) || 
+		m_itemType == StringItem ||
 	    m_itemType == BoolItem ||
 	    m_itemType == EnumerationItem)
 	{
 		convert << "\"value\" : \"" << m_value << "\", ";
 		convert << "\"default\" : \"" << m_default << "\"";
 	}
-	else if (m_itemType == JsonItem ||
+	else if ((m_itemType == JsonItem && !jsonQuotes) ||
 		 m_itemType == NumberItem ||
 		 m_itemType == DoubleItem ||
 		 m_itemType == ScriptItem)
