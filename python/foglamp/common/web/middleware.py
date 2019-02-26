@@ -8,6 +8,7 @@ import asyncio
 from functools import wraps
 import json
 import traceback
+import logging
 
 from aiohttp import web
 import jwt
@@ -20,7 +21,7 @@ __copyright__ = "Copyright (c) 2017 OSIsoft, LLC"
 __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
-_logger = logger.setup(__name__)
+_logger = logger.setup(__name__, level=20)
 
 
 async def error_middleware(app, handler):
@@ -84,6 +85,33 @@ async def auth_middleware(app, handler):
             elif str(handler).startswith("<function login"):
                 pass
             elif str(handler).startswith("<function update_password"):  # when pwd expiration
+                pass
+            else:
+                raise web.HTTPForbidden()
+
+        return await handler(request)
+    return middleware
+
+
+async def cert_middleware(app, handler):
+    async def middleware(request):
+        _logger.info("cert: Received %s request for %s", request.method, request.path)
+
+        request.is_auth_optional = True
+        request.user = None
+
+        if request.method == 'OPTIONS':
+            return await handler(request)
+
+        peercert = request.transport.get_extra_info("peercert")
+        if peercert:
+            try:
+                # TODO: Check if certs match else raise ConnectionError
+                pass
+            except ConnectionError as e:
+                raise ConnectionError("No SSL certificate supplied")
+        else:
+            if str(handler).startswith("<function ping"):
                 pass
             else:
                 raise web.HTTPForbidden()

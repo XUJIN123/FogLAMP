@@ -163,6 +163,14 @@ class Server:
             'displayName': 'Auth Providers',
             'order': '8'
         },
+        'authMethod': {
+            'description': 'Authentication method',
+            'type': 'enumeration',
+            'options': ["any", "password", "certificate"],
+            'default': 'any',
+            'displayName': 'Authentication method',
+            'order': '9'
+        },
         'certificateName': {
             'description': 'Certificate file name',
             'type': 'string',
@@ -331,6 +339,7 @@ class Server:
 
             try:
                 cls.is_auth_required = True if config['authentication']['value'] == "mandatory" else False
+                cls.auth_method = config['authMethod']['value']
             except KeyError:
                 _logger.error("error in retrieving authentication info")
                 raise
@@ -366,14 +375,18 @@ class Server:
             raise
 
     @staticmethod
-    def _make_app(auth_required=True):
+    def _make_app(auth_required=True, auth_method='username'):
         """Creates the REST server
 
         :rtype: web.Application
         """
-        app = web.Application(middlewares=[middleware.error_middleware, middleware.auth_middleware])
         if not auth_required:
             app = web.Application(middlewares=[middleware.error_middleware, middleware.optional_auth_middleware])
+        else:
+            if auth_method == 'certificate':
+                app = web.Application(middlewares=[middleware.error_middleware, middleware.cert_middleware])
+            else:
+                app = web.Application(middlewares=[middleware.error_middleware, middleware.auth_middleware])
         admin_routes.setup(app)
         return app
 
@@ -667,7 +680,7 @@ class Server:
             loop.run_until_complete(cls._start_service_monitor())
 
             loop.run_until_complete(cls.rest_api_config())
-            cls.service_app = cls._make_app(auth_required=cls.is_auth_required)
+            cls.service_app = cls._make_app(auth_required=cls.is_auth_required, auth_method=cls.auth_method)
             # ssl context
             ssl_ctx = None
             if not cls.is_rest_server_http_enabled:
