@@ -8,7 +8,7 @@ import asyncio
 from functools import wraps
 import json
 import traceback
-import logging
+import ssl
 
 from aiohttp import web
 import jwt
@@ -106,10 +106,9 @@ async def cert_middleware(app, handler):
         peercert = request.transport.get_extra_info("peercert")
         if peercert:
             try:
-                # TODO: Check if certs match else raise ConnectionError
-                pass
-            except ConnectionError as e:
-                raise ConnectionError("No SSL certificate supplied")
+                ssl.match_hostname(peercert, "dianomic.com")
+            except ssl.CertificateError as e:
+                raise ConnectionError("SSL Certificate Error: %s", str(peercert))
         else:
             if str(handler).startswith("<function ping"):
                 pass
