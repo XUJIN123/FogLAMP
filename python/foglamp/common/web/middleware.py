@@ -21,7 +21,7 @@ __copyright__ = "Copyright (c) 2017 OSIsoft, LLC"
 __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
-_logger = logger.setup(__name__, level=20)
+_logger = logger.setup(__name__)
 
 
 async def error_middleware(app, handler):
@@ -103,10 +103,12 @@ async def cert_middleware(app, handler):
         if request.method == 'OPTIONS':
             return await handler(request)
 
+        sslcontext = request.transport.get_extra_info("sslcontext")
         peercert = request.transport.get_extra_info("peercert")
-        if peercert:
+        if sslcontext:
             try:
-                ssl.match_hostname(peercert, "dianomic.com")
+                _logger.warning(">>>>>>>>>>>>>>>>> %s %s %s", sslcontext.verify_mode, sslcontext.cert_store_stats(), peercert)
+                # ssl.match_hostname(peercert, "foglamp")
             except ssl.CertificateError as e:
                 raise ConnectionError("SSL Certificate Error: %s", str(peercert))
         else:
