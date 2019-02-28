@@ -240,12 +240,12 @@ class Server:
     core_app, core_server, core_server_handler = None, None, None
 
     @classmethod
-    def get_certificates(cls, server=None):
+    def get_certificates(cls):
         # TODO: FOGL-780
         if _FOGLAMP_DATA:
-            cls.certs_dir = os.path.expanduser(_FOGLAMP_DATA + '/etc/certs')
+            certs_dir = os.path.expanduser(_FOGLAMP_DATA + '/etc/certs')
         else:
-            cls.certs_dir = os.path.expanduser(_FOGLAMP_ROOT + '/data/etc/certs')
+            certs_dir = os.path.expanduser(_FOGLAMP_ROOT + '/data/etc/certs')
 
         """ Generated using
                 $ openssl version
@@ -291,17 +291,13 @@ class Server:
         Put these in $FOGLAMP_DATA/etc/certs, $FOGLAMP_ROOT/data/etc/certs or /usr/local/foglamp/data/etc/certs
 
         """
-        if server is None:
-            cert = cls.certs_dir + '/{}.cert'.format(cls.cert_file_name)
-            key = cls.certs_dir + '/{}.key'.format(cls.cert_file_name)
-        else:
-            cert = cls.certs_dir + '/server-cert.pem'
-            key = cls.certs_dir + '/server-key.pem'
+        cert = certs_dir + '/{}.cert'.format(cls.cert_file_name)
+        key = certs_dir + '/{}.key'.format(cls.cert_file_name)
 
         if not os.path.isfile(cert) or not os.path.isfile(key):
             _logger.warning("%s certificate files are missing. Hence using default certificate.", cls.cert_file_name)
-            cert = cls.certs_dir + '/foglamp.cert'
-            key = cls.certs_dir + '/foglamp.key'
+            cert = certs_dir + '/foglamp.cert'
+            key = certs_dir + '/foglamp.key'
             if not os.path.isfile(cert) or not os.path.isfile(key):
                 _logger.error("Certificates are missing")
                 raise RuntimeError
@@ -693,27 +689,10 @@ class Server:
             if not cls.is_rest_server_http_enabled:
                 # ensure TLS 1.2 and SHA-256
                 # handle expiry?
-                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, capath=cls.certs_dir)
+                ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
                 cert, key = cls.get_certificates()
                 _logger.info('Loading certificates %s and key %s', cert, key)
                 ssl_ctx.load_cert_chain(cert, key)
-
-                def server_name_cb(s, n, x):
-                    x.wrap_socket(s, server_hostname=n)
-
-                if cls.auth_method == 'certificate':
-                    ssl_ctx = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH, capath=cls.certs_dir)
-                    cert, key = cls.get_certificates("server")
-                    _logger.info('Loading certificates %s and key %s', cert, key)
-                    ssl_ctx.load_cert_chain(cert, key)
-
-                    ssl_ctx.verify_mode = ssl.CERT_OPTIONAL
-                    # ssl_ctx.set_servername_callback(server_name_cb)
-                    # ssl_ctx.check_hostname = True
-                    ssl_ctx.set_alpn_protocols(['http/1.1'])
-                    ssl_ctx.load_verify_locations(capath=cls.certs_dir)
-                    ssl_ctx.load_default_certs(ssl.Purpose.CLIENT_AUTH)
-                    _logger.warning(">>>>>>>>>>>>>>> %s", ssl_ctx.get_ca_certs())
 
             # Get the service data and advertise the management port of the core
             # to allow other microservices to find FogLAMP
