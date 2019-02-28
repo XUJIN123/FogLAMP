@@ -14,6 +14,7 @@ from aiohttp import web
 import jwt
 
 from foglamp.services.core.user_model import User
+from foglamp.common.web.tls_helper import BaseCert, VerificationError
 from foglamp.common import logger
 
 __author__ = "Praveen Garg"
@@ -22,6 +23,8 @@ __license__ = "Apache 2.0"
 __version__ = "${VERSION}"
 
 _logger = logger.setup(__name__)
+_FOGLAMP_DATA = os.getenv("FOGLAMP_DATA", default=None)
+_FOGLAMP_ROOT = os.getenv("FOGLAMP_ROOT", default='/usr/local/foglamp')
 
 
 async def error_middleware(app, handler):
@@ -103,22 +106,71 @@ async def cert_middleware(app, handler):
         if request.method == 'OPTIONS':
             return await handler(request)
 
-        sslcontext = request.transport.get_extra_info("sslcontext")
-        peercert = request.transport.get_extra_info("peercert")
-        if sslcontext:
+        token = request.headers.get('authorization', None)
+        if token:
             try:
-                _logger.warning(">>>>>>>>>>>>>>>>> %s %s %s", sslcontext.verify_mode, sslcontext.cert_store_stats(), peercert)
-                # ssl.match_hostname(peercert, "foglamp")
-            except ssl.CertificateError as e:
-                raise ConnectionError("SSL Certificate Error: %s", str(peercert))
+                # validate the token and get user id
+                uid = await User.Objects.validate_token(token)
+                # extend the token expiry, as token is valid
+                # and no bad token exception raised
+                await User.Objects.refresh_token_expiry(token)
+                # set the user to request object
+                request.user = await User.Objects.get(uid=uid)
+                # set the token to request
+                request.token = token
+            except(User.InvalidToken, User.TokenExpired) as e:
+                raise web.HTTPUnauthorized(reason=e)
+            except (jwt.DecodeError, jwt.ExpiredSignatureError) as e:
+                raise web.HTTPUnauthorized(reason=e)
         else:
-            if str(handler).startswith("<function ping"):
-                pass
+            user_cert = request.headers.get('user_cert', None)
+            if user_cert:
+                try:
+                    cert = BaseCert.from_pem(user_cert)
+                except ValueError:
+                    cert = None
+                if not cert:
+                    raise web.HTTPBadRequest(reason=e)
+                try:
+                    verify(cert)
+                except VerificationError as e:
+                    raise web.HTTPUnauthorized(reason=e)
             else:
-                raise web.HTTPForbidden()
-
+                if str(handler).startswith("<function ping"):
+                    pass
+                else:
+                    raise web.HTTPForbidden()
         return await handler(request)
     return middleware
+
+
+def verify(cert):
+    if _FOGLAMP_DATA:
+        certs_dir = os.path.expanduser(_FOGLAMP_DATA + '/etc/certs')
+    else:
+        certs_dir = os.path.expanduser(_FOGLAMP_ROOT + '/data/etc/certs')
+
+    with open('/PATH/TO/my-ca.crt') as fp:
+        CA_CERT = certs_dir + '/ca.pem'
+
+    REVOKED_CERTS = (
+        # # Example X
+        # ('SHA-256', (
+        #     'F8:7F:30:7B:12:15:15:47:07:93:D4:99:8F:7B:2E:DF:'
+        #     '12:5A:2C:0F:C4:BD:5E:56:B8:5C:93:A3:65:CB:63:9B')),
+        # # Example Y
+        # ('SHA-256', (
+        #     '00:11:22:33:44:55:66:77:88:99:AA:BB:CC:DD:EE:FF:'
+        #     '12:5A:2C:0F:C4:BD:5E:56:B8:5C:93:A3:65:CB:63:9B')),
+        # # Example Z
+        # # ('SHA-256',
+        # #     '36:9F:36:7F:0C:90:26:A1:AD:A3:79:E9:A9:8B:F5:74:'
+        # #     '21:B1:29:4B:67:73:78:B4:DE:CF:FA:C5:A6:42:BA:03'),
+    )
+    cert.set_trusted_ca(CA_CERT)
+    for revoked_cert in REVOKED_CERTS:
+        cert.add_revoked_fingerprint(*revoked_cert)
+    cert.verify()  # raises VerificationError
 
 
 def has_permission(permission):
